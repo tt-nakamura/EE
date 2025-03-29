@@ -2,13 +2,12 @@
 //   http://www.shoup.net/ntl
 
 #include "EEFactoring.h"
-#include<NTL/Pair.h>
 using namespace NTL;
 
 void FactorPrime(EE& f, const ZZ& p)
 // find x,y such that x^2 - xy + y^2 = p
 // where p is prime and p==1 (mod 3)
-// return f = x+yw, y==0 (mod 3)
+// return f = x+yw, x==2,y==0(mod 3)
 {
     ZZ a,b,c,q,r,t, &x(f.x), &y(f.y);
     sub(b,a=p,3);
@@ -40,7 +39,7 @@ void FactorPrime(EE& f, const ZZ& p)
 }
 
 void factor(Vec<Pair<EE, long> >& f, const EE& a)
-// f = factorization of a into eisenstein primes
+// f = factorization of a into Eisenstein primes
 // each element of f is a pair of prime and its exponent
 // such that product of prime^{exponent} is associate of a.
 // real factors are inserted first in f (if any)
@@ -99,7 +98,7 @@ void factor(Vec<Pair<EE, long> >& f, const EE& a)
 }
 
 void mul(EE& a, const Vec<Pair<EE, long> >& f)
-// a = product of (eisenstein integer)^{exponent} in f
+// a = product of (Eisenstein integer)^{exponent} in f
 // each element of f is a pair of integer and exponent
 {
     int i;
