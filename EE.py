@@ -43,30 +43,29 @@ class EE:
             return EE(b*a.x, b*a.y)
 
     def __truediv__(a,b):
-        """ a = bq + r, norm(r) <= (3/4)*norm(b) """
+        """ a = bq + r, norm(r) <= norm(b)/2 """
         if isinstance(b, EE):
             a *= conj(b)
             b = norm(b)
-
         x = ((a.x<<1) + b)//(b<<1)
         y = ((a.y<<1) + b)//(b<<1)
         return EE(x,y)
 
     def __mod__(a,b):
-        return a - a/b*b
+        q = a/b
+        return a - b*q
 
     def __divmod__(a,b):
         q = a/b
         return q, a - b*q
 
-    def __pow__(a,e):
-        """ assume e>=0 """
-        if e==0: return EE(1)
-        n = (1<<(e.bit_length()-1))>>1
+    def __pow__(a,k): # assume k>=0
+        if k==0: return EE(1)
+        n = (1<<(k.bit_length()-1))>>1
         b = a
         while n:
             b *= b
-            if e&n: b *= a
+            if k&n: b *= a
             n>>=1
         return b
 
@@ -75,6 +74,9 @@ class EE:
             return a.x == b.x and a.y == b.y
         else:
             return a.x == b and a.y == 0
+
+    def __ne__(a,b):
+        return not a.__eq__(b)
 
     def __radd__(a,b):
         return EE(b + a.x, a.y)
@@ -97,43 +99,45 @@ class EE:
     def __complex__(a):
         return a.x + w*a.y
 
-def norm(a): return (a.x - a.y)**2 + a.x*a.y
+    def isUnit(a):# test if norm(a)==1
+        return (a.y==0 and abs(a.x)==1) or\
+               (abs(a.y)==1 and (a.x==0 or a.x==a.y))
 
-def conj(a): return EE(a.x-a.y, -a.y)
-def IsUnit(a): return (a.y==0 and abs(a.x)==1)\
-                   or (a.y==1 and (a.x==0 or a.x==1))\
-                   or (a.y==-1 and (a.x==0 or a.x==-1))
-def rot60(a): return EE(a.x-a.y, a.x) # -a/w
+def norm(a): return (a.x - a.y)**2 + a.x*a.y# |a|^2
+def conj(a): return EE(a.x-a.y, -a.y) # complex conjugate of a
+def rot60(a): return EE(a.x-a.y, a.x) # a*(1+w)
 def rot120(a): return EE(-a.y, a.x-a.y) # a*w
 def mirror(a): return EE(a.x, a.x-a.y) # reflect wrt y=x/sqrt(3)
 
 def IsAssoc(a, b, exponent=False):
-    """ test if a == b*w^{e/2} for some e (e=0,1,...,5)
+    """ a,b: EE, return int
+    test if a == b*(1+w)^k for some k=0,1,...,5
     if exponent is False, return True or False
-    else if a is associate of b, return e
+    else if a is associate of b, return k
     else return -1
     """
     c = FirstHex(a, exponent)
     d = FirstHex(b, exponent)
     if exponent:
         if c[0]!=d[0]: return -1
-        e = d[1] - c[1]
-        return e if e>=0 else e+6
+        k = d[1] - c[1]
+        return k if k>=0 else k+6
     else: return c==d
 
-def rot60e(a,e):
-    """ a*w^(e/2) """
-    e %= 6
-    if   e==1: return rot60(a)
-    elif e==2: return rot120(a)
-    elif e==3: return -a
-    elif e==4: return -rot60(a)
-    elif e==5: return -rot120(a)
+def rot60k(a,k):# a*(1+w)^k
+    """ a: EE, k: int, return EE """
+    k %= 6
+    if   k==1: return rot60(a)
+    elif k==2: return rot120(a)
+    elif k==3: return -a
+    elif k==4: return -rot60(a)
+    elif k==5: return -rot120(a)
     else: return a
 
 def hexant(a):
-    """ return -1 if a==0,
-    return e if 60e <= arg(a) < 60*(e+1) (e=0,1,...,5)
+    """ a: EE, return int
+    return -1 if a==0,
+    return k if 60k <= arg(a) < 60*(k+1) (k=0,1,...,5)
     """
     if a.y==0:
         if a.x==0: return -1
@@ -148,30 +152,34 @@ def hexant(a):
     else: return 5
 
 def FirstHex(a, exponent=False):
-    """ return b = a*w^(e/2) for some e (e=0,1,...,5)
-    in first hexant 0 <= arg(b) < 60
-    if exponent is True, return b and e
-    if a is zero, then b=0 and e=0
+    """ a: EE, return EE
+    return b = a*(1+w)^k for some k=0,1,...,5
+      in first hexant 0 <= arg(b) < 60
+    if exponent is True, return b and k
+    if a is zero, then b=0 and k=0
     """
-    e = hexant(a)
-    e = 6-e if e>0 else 0
-    b = rot60e(a,e)
-    if exponent: return b,e
+    k = hexant(a)
+    k = 6-k if k>0 else 0
+    b = rot60k(a,k)
+    if exponent: return b,k
     else: return b
 
 def GCD(a,b):
-    """ d = greatest common divisor of a and b
-    in first hexant 0 <= arg(d) < 60
-    by Euclidean algorithm
+    """ a,b: EE, return EE
+    d = greatest common divisor of a and b
+      in first hexant 0 <= arg(d) < 60
+      by Euclidean algorithm
+    return d
     if a and b are both zero, then d=0
     """
     while b!=0: a,b = b,a%b
     return FirstHex(a)
 
 def XGCD(a,b):
-    """ d = greatest common divisor of a and b
-    in first hexant 0 <= arg(d) < 60
-    by extended Euclidean algorithm
+    """ a,b: EE, return EE*3
+    d = greatest common divisor of a and b
+      in first hexant 0 <= arg(d) < 60
+      by extended Euclidean algorithm
     return d,s,t such that d = s*a + t*b
     if a and b are both zero, then d,s,t=0,1,0
     """
@@ -182,36 +190,80 @@ def XGCD(a,b):
         s,u = u, s-u*q
         t,v = v, t-v*q
         a,b = b,r
-    d,e = FirstHex(a, True)
-    s = rot60e(s,e)
-    t = rot60e(t,e)
+    d,k = FirstHex(a, True)
+    s = rot60k(s,k)
+    t = rot60k(t,k)
     return d,s,t
 
-#########################################################
-from sympy import sqrt_mod, factorint, randprime, isprime
-from math import gcd
-from random import randrange
-
-def primary(a):
-    """ return a*unit = x+yw
-      such that x==2 and y==0 (mod 3).
-    assume norm(a) != 0 (mod 3)
+def primary(a, exponent=False):
+    """ a: EE, return EE
+    return b such that a = \pm w^k * b (k=0,1,2)
+    and b.x==2 (mod 3) and b.y==0 (mod 3)
+    Assume norm(a) != 0 (mod 3)
+    if exponent is True, return b and k
     """
     x,y = a.x%3, a.y%3
     if y==2: a = -a
-    if x==y: return rot120(a)
-    elif x==0: return rot60(a)
-    elif x==1: return -a
+    if x==y: a,e = rot120(a), 2
+    elif x==0: a,e = rot60(a), 1
+    elif x==1: a,e = -a,0
+    else: e = 0
+    if exponent: return a,e
     else: return a
 
-def FactorPrime(p):
-    """ given a prime number p where p==1 (mod 3),
-    find x,y such that x*x - x*y + y*y = p
-    and return primary(x+yw)
+def ResSymb(a,b):
+    """a,b: EE, return EE
+    return cubic residue symbol (a/b)_3 = 0,1,w,w^2
+    Assume norm(a) < norm(b) and norm(b) != 0 (mod 3)
+    Assume b is primary, but may not be prime
+    reference: K. Ireland and M. Rosen
+      "A Classical Introduction to Modern Number Theory" section 9.3
     """
-    a,b = p, sqrt_mod(p-3, p)
+    j,lam = 0, EE(1,-1)
+    while a!=0:
+        m,n = (b.x+1)//3, b.y//3
+        m,n = m%3,(m+n)%3
+        while True:
+            q,r = divmod(a, lam)
+            if r!=0: break
+            a,j = q, j-m
+
+        a,k = primary(a, True)
+        a,b,j = b%a, a, (j+k*n)%3
+
+    if not b.isUnit(): return EE()
+    elif j==0: return EE(1)
+    elif j==1: return EE(0,1)
+    else: return EE(-1,-1)
+
+def PowerMod(a,k,n):# a^k mod n
+    """ a,n: EE, k: int, return EE """
+    if k==0: return EE(1)
+    m = (1<<(k.bit_length()-1))>>1
+    b = a
+    while m:
+        b = b*b%n
+        if k&m: b = b*a%n
+        m>>=1
+    return b
+
+#########################################################
+import sympy as sp
+from sympy.abc import x
+from math import gcd
+from random import randrange
+
+def FactorPrime(p):
+    """ p: int, return EE
+    given prime number p,
+    find x,y such that x*x - x*y + y*y = p
+         and x==2, y==0 (mod 3)
+    Assume p==1 (mod 3)
+    return f = x+y*w (primary prime)
+    """
+    a,b = p, sp.sqrt_mod(p-3, p)
     if b&1==0: b = p-b
-    c,x,y = ((b**2 + 3)//a)>>2, 1,0
+    c,x,y = ((b*b + 3)//p)>>2, 1,0
     while True:
         if a>c: a,b,c,x,y = c,-b,a,-y,x
         if b<=a and b>-a: break
@@ -221,19 +273,20 @@ def FactorPrime(p):
     return primary(EE(x,-y))
 
 def factor(a):
-    """ factorize a into Eisenstein primes
+    """ a: EE, return dict{EE,int}
+    factorize a into Eisenstein primes
     return dictionary of (prime, exponent) pair
     such that product of p**e is associate of a
     real factors are positive and
-    imaginary factors are primary
+    imaginary factors are in primary
     """
     if not isinstance(a,EE): a = EE(a)
     f = {}
-    if a==0 or IsUnit(a): return f
+    if a==0 or a.isUnit(): return f
     d = gcd(a.x, a.y)
     if d>1: a /= d
-    g = factorint(norm(a))
-    h = factorint(d)
+    g = sp.factorint(norm(a))
+    h = sp.factorint(d)
 
     k = g.pop(3,0) + 2*h.pop(3,0)
     if k: f[EE(1,-1)] = k
@@ -254,27 +307,56 @@ def factor(a):
     return f
 
 def IsPrime(a):
-    """ test if a is Eisenstein prime """
+    """ a: EE, return bool
+    test if a is Eisenstein prime
+    """
     if not isinstance(a,EE): a = EE(a)
-    if   a.y==0: b = abs(a.x)
+    if a.y==0 or a.x==a.y: b = abs(a.x)
     elif a.x==0: b = abs(a.y)
     else: b = -1
-    if b>=0: return b%3 == 2 and isprime(b)
+    if b>=0: return b%3 == 2 and sp.isprime(b)
     b = norm(a)
-    return b==3 or (b%3 == 1 and isprime(b))
+    return b==3 or (b%3 == 1 and sp.isprime(b))
 
 def GenPrime(l, f=1):
-    """ generate random Eisenstein prime p
-    such that norm(p) == q^f (f=1,2) where
-    q is prime number, bit length of norm(p) is l
-    and p is primary; assume l>=2
+    """ l,f: int, return EE
+    generate random Eisenstein prime p
+    Assume f=1 or 2; Assume l>=2
+    if f=1, |p|^2=q and q==1 (mod 3)
+    if f=2, p=q+0i and q==2 (mod 3)
+    where q is random prime and 2^{l-1} <= q < 2^l
+    p is primary, i.e., p.x==2, p.y==0 (mod 3)
     """
     while True:
-        p = randprime(1<<(l-1), 1<<l)
-        if f<=1:
+        p = sp.randprime(1<<(l-1), 1<<l)
+        if f <= 1:
             if p == 3: return EE(1,-1)
             if p%3 == 1:
                 p = FactorPrime(p)
                 if randrange(2): return p
                 else: return conj(p)
-        elif p%3 == 2: return p
+
+        elif p%3 == 2: return EE(p)
+
+def InvMod(a,p):
+    """ a,p: int, return int
+    return x such that ax==1 (mod p)
+    Assume a and p are relatively prime
+    """
+    s,u = 1,0
+    while p:
+        q,r = divmod(a,p)
+        a,p,s,u = p,r,u,s-q*u
+    return s
+
+def CubRootMod(a,p):
+    """ a,p: EE, return EE
+    solve x^3 == a (mod p) and return x
+    Assume norm(p) is prime and norm(p)==1 (mod 3)
+    Assume (a/p)_3 == 1
+    """
+    n = norm(p)
+    b = p.x * InvMod(p.y, n) % n
+    b = (a.x - b * a.y % n) % n
+    F = sp.factor_list(x**3 - b, modulus=n)
+    return int(-F[1][0][0].coeff(x,0))%p

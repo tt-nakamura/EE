@@ -1,2 +1,2 @@
 # EE
-Eisenstein integer x+yw and its prime factorization
+cubic reciprocity on Eisenstein integers
